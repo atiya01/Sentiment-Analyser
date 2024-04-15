@@ -20,6 +20,7 @@ import nltk
 # Download NLTK stopwords
 nltk.download('punkt')
 nltk.download('stopwords')
+nltk.download('wordnet')  # Add this line to download WordNet data
 
 
 # Load the SVM model from the pickle file
