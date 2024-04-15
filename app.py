@@ -14,6 +14,8 @@ from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 from googleapiclient.errors import HttpError
+import joblib
+
 
 # Load the SVM model from the pickle file
 svm_pipeline = joblib.load(open("svm_text_sentiment.pkl", "rb"))
