@@ -16,7 +16,10 @@ from nltk.stem import WordNetLemmatizer
 from googleapiclient.errors import HttpError
 import joblib
 import nltk
+
+# Download NLTK stopwords
 nltk.download('punkt')
+nltk.download('stopwords')
 
 
 # Load the SVM model from the pickle file
