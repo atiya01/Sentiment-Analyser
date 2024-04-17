@@ -101,7 +101,7 @@ def main(smartphone_features, smartphone_keywords):
     # Allow users to input their YouTube Data API key
     youtube_api_key = st.text_input("Enter your YouTube Data API Key")
 
-    search_query = st.text_input("Search Query")
+    search_query = st.text_input("Search Smartphone")
 
     if st.button("Search"):
         if not any(keyword in search_query.lower() for keyword in smartphone_keywords) and not any(keyword in search_query.lower() for keyword in smartphone_features):
@@ -121,7 +121,7 @@ def main(smartphone_features, smartphone_keywords):
             part='id,snippet',
             type='video',
             order='viewCount',
-            maxResults=1  # Adjust this value as needed
+            maxResults=10  # Adjust this value as needed
         ).execute()
 
         # Filter videos based on view count (> 50k views) and keyword in title
