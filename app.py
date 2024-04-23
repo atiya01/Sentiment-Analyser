@@ -55,6 +55,15 @@ def preprocess_text(text):
     preprocessed_text = ' '.join(tokens)
     return preprocessed_text
 
+# Function to map sentiment score to labels
+def map_sentiment(score):
+    if score > 0:  # Positive sentiment
+        return 'Positive'
+    elif score == 0:  # Neutral sentiment
+        return 'Neutral'
+    else:  # Negative sentiment
+        return 'Negative'
+
 def fetch_comments(video_id, youtube_api_key):
     """
     Fetches comments for a YouTube video.
@@ -73,7 +82,7 @@ def fetch_comments(video_id, youtube_api_key):
                 part="snippet",
                 videoId=video_id,
                 textFormat="plainText",
-                maxResults=100,  # Adjust this value to fetch more comments per page
+                maxResults=10,  # Adjust this value to fetch more comments per page
                 pageToken=next_page_token
             )
             response = request.execute()
@@ -96,6 +105,36 @@ def fetch_comments(video_id, youtube_api_key):
 
 def main(smartphone_features, smartphone_keywords):
     st.title("Smartphone YouTube Comment Sentiment Analyzer")
+    
+    # Instructions Section
+    st.sidebar.title("Instructions")
+    st.sidebar.markdown("""
+    1. **Enter Your YouTube Data API Key:**
+        - Before you begin, ensure you have a YouTube Data API key. If you don't have one, you can obtain it from the Google Cloud Console.
+        - Copy and paste your API key into the text input provided.
+        
+    2. **Search for Smartphone-related Videos:**
+        - In the "Search Smartphone" field, enter keywords related to the smartphone videos you want to analyze.
+        - Click the "Search" button to initiate the search.
+        
+    3. **Explore Sentiment Analysis:**
+        - Once the search is complete, the app will fetch the most popular videos related to your query (with over 50,000 views).
+        - The app will then analyze the sentiment of comments on these videos.
+        - You will see a distribution of sentiments (positive, neutral, negative) in a bar chart.
+        - Additionally, a word cloud will visualize the most common words used in the comments.
+        
+    4. **Explore Top Comments:**
+        - The app identifies and displays the top 5 positive and negative comments mentioning smartphone features.
+        - These comments are sorted based on the number of likes they received.
+        
+    5. **Explore Smartphone Features:**
+        - The app extracts and visualizes the top 20 smartphone features mentioned in the comments.
+        - Features are displayed in a bar chart, highlighting their frequency in the comments.
+        
+    6. **Note:**
+        - This app requires a valid YouTube Data API key to fetch videos and comments.
+        - Comments with disabled comment sections or comments containing less than 20 characters are excluded from analysis.
+    """)
     st.subheader("Search by Keyword")
 
     # Allow users to input their YouTube Data API key
@@ -150,7 +189,7 @@ def main(smartphone_features, smartphone_keywords):
                         part="snippet",
                         videoId=video_id,
                         textFormat="plainText",
-                        maxResults=20,  # Adjust this value to fetch more comments per page
+                        maxResults=100,  # Adjust this value to fetch more comments per page
                         pageToken=next_page_token
                     )
                     response = request.execute()
@@ -185,16 +224,34 @@ def main(smartphone_features, smartphone_keywords):
 
         # Visualize sentiment distribution using a bar chart with percentages
         st.subheader("Sentiment Distribution")
-        sentiment_df = pd.DataFrame({'Sentiment': list(sentiment_percentages.keys()), 'Percentage': list(sentiment_percentages.values())})
+
+        # Map sentiment scores to labels using the map_sentiment function
+        sentiments_labels = [map_sentiment(score) for score in sentiment_percentages.keys()]
+
+        # Create DataFrame with sentiment labels and corresponding percentages
+        sentiment_df = pd.DataFrame({'Sentiment': sentiments_labels, 'Percentage': sentiment_percentages.values()})
+
+        # Create the bar chart
         bar_chart = alt.Chart(sentiment_df).mark_bar().encode(
-            x='Sentiment',
+            x=alt.X('Sentiment', axis=alt.Axis(labels=True)),  # Allow axis labels
             y='Percentage',
-            color=alt.Color('Sentiment', scale=alt.Scale(domain=['positive', 'neutral', 'negative'], range=['green', 'orange', 'red'])),
+            color=alt.Color('Sentiment', scale=alt.Scale(domain=['Positive', 'Neutral', 'Negative'], range=['green', 'orange', 'red'])),
             tooltip=['Sentiment', 'Percentage']
         ).properties(
             width=500,
             height=300
         )
+
+        # Update the chart axis with labels
+        bar_chart = bar_chart.configure_axis(
+            labelFontSize=12,
+            titleFontSize=14
+        ).configure_legend(
+            titleFontSize=12,
+            labelFontSize=10
+        )
+
+        # Display the chart
         st.altair_chart(bar_chart, use_container_width=True)
 
         # Generate word cloud
@@ -216,29 +273,31 @@ def main(smartphone_features, smartphone_keywords):
             if any(feature in text for feature in smartphone_features):
                 # Check if the comment contains keywords related to smartphones
                 if any(keyword in text for keyword in smartphone_keywords):
-                    if sentiment == 'positive':
+                    mapped_sentiment = map_sentiment(sentiment)
+                    if mapped_sentiment == 'Positive':
                         strongly_positive_comments_with_features.append(comment)
-                    elif sentiment == 'negative':
+                    elif mapped_sentiment == 'Negative':
                         strongly_negative_comments_with_features.append(comment)
 
-        # Sort comments based on likes in descending order
-        strongly_positive_comments_with_features.sort(key=lambda x: int(x['likeCount']), reverse=True)
-        strongly_negative_comments_with_features.sort(key=lambda x: int(x['likeCount']), reverse=True)
+        # Sort comments based on the number of likes (or any other engagement metric)
+        strongly_positive_comments_with_features.sort(key=lambda x: int(x.get('likeCount', 0)), reverse=True)
+        strongly_negative_comments_with_features.sort(key=lambda x: int(x.get('likeCount', 0)), reverse=True)
 
         # Display the top 5 positive comments mentioning smartphone features
         st.subheader("Top 5 Positive Comments Mentioning Smartphone Features")
         for i, comment in enumerate(strongly_positive_comments_with_features[:5]):
-            st.write(f"**Comment {i+1} (Likes: {comment['likeCount']})**: {comment['textDisplay']}")
+            st.write(f"**Comment {i+1} (Likes: {comment.get('likeCount', 0)})**: {comment['textDisplay']}")
 
         # Display the top 5 negative comments mentioning smartphone features
         st.subheader("Top 5 Negative Comments Mentioning Smartphone Features")
         for i, comment in enumerate(strongly_negative_comments_with_features[:5]):
-            st.write(f"**Comment {i+1} (Likes: {comment['likeCount']})**: {comment['textDisplay']}")
+            st.write(f"**Comment {i+1} (Likes: {comment.get('likeCount', 0)})**: {comment['textDisplay']}")
 
-        # Extract top 20 smartphone features and visualize them
-        st.subheader("Top 20 Smartphone Features")
+
+        # Extract top 10 smartphone features and visualize them
+        st.subheader("Top 10 Smartphone Features")
         features = [comment['textDisplay'] for comment in all_comments]
-        word_vectorizer = CountVectorizer(stop_words='english', max_features=20)
+        word_vectorizer = CountVectorizer(stop_words='english', max_features=10)
         word_frequencies = word_vectorizer.fit_transform(features)
         feature_names = word_vectorizer.get_feature_names_out()
         feature_counts = word_frequencies.toarray().sum(axis=0)
