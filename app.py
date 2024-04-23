@@ -55,15 +55,6 @@ def preprocess_text(text):
     preprocessed_text = ' '.join(tokens)
     return preprocessed_text
 
-# Function to map sentiment score to labels
-def map_sentiment(score):
-    if score > 0:  # Positive sentiment
-        return 'Positive'
-    elif score == 0:  # Neutral sentiment
-        return 'Neutral'
-    else:  # Negative sentiment
-        return 'Negative'
-
 def fetch_comments(video_id, youtube_api_key):
     """
     Fetches comments for a YouTube video.
@@ -82,7 +73,7 @@ def fetch_comments(video_id, youtube_api_key):
                 part="snippet",
                 videoId=video_id,
                 textFormat="plainText",
-                maxResults=10,  # Adjust this value to fetch more comments per page
+                maxResults=100,  # Adjust this value to fetch more comments per page
                 pageToken=next_page_token
             )
             response = request.execute()
@@ -105,7 +96,6 @@ def fetch_comments(video_id, youtube_api_key):
 
 def main(smartphone_features, smartphone_keywords):
     st.title("Smartphone YouTube Comment Sentiment Analyzer")
-    
     # Instructions Section
     st.sidebar.title("Instructions")
     st.sidebar.markdown("""
@@ -189,7 +179,7 @@ def main(smartphone_features, smartphone_keywords):
                         part="snippet",
                         videoId=video_id,
                         textFormat="plainText",
-                        maxResults=100,  # Adjust this value to fetch more comments per page
+                        maxResults=20,  # Adjust this value to fetch more comments per page
                         pageToken=next_page_token
                     )
                     response = request.execute()
@@ -224,34 +214,16 @@ def main(smartphone_features, smartphone_keywords):
 
         # Visualize sentiment distribution using a bar chart with percentages
         st.subheader("Sentiment Distribution")
-
-        # Map sentiment scores to labels using the map_sentiment function
-        sentiments_labels = [map_sentiment(score) for score in sentiment_percentages.keys()]
-
-        # Create DataFrame with sentiment labels and corresponding percentages
-        sentiment_df = pd.DataFrame({'Sentiment': sentiments_labels, 'Percentage': sentiment_percentages.values()})
-
-        # Create the bar chart
+        sentiment_df = pd.DataFrame({'Sentiment': list(sentiment_percentages.keys()), 'Percentage': list(sentiment_percentages.values())})
         bar_chart = alt.Chart(sentiment_df).mark_bar().encode(
-            x=alt.X('Sentiment', axis=alt.Axis(labels=True)),  # Allow axis labels
+            x='Sentiment',
             y='Percentage',
-            color=alt.Color('Sentiment', scale=alt.Scale(domain=['Positive', 'Neutral', 'Negative'], range=['green', 'orange', 'red'])),
+            color=alt.Color('Sentiment', scale=alt.Scale(domain=['positive', 'neutral', 'negative'], range=['green', 'orange', 'red'])),
             tooltip=['Sentiment', 'Percentage']
         ).properties(
             width=500,
             height=300
         )
-
-        # Update the chart axis with labels
-        bar_chart = bar_chart.configure_axis(
-            labelFontSize=12,
-            titleFontSize=14
-        ).configure_legend(
-            titleFontSize=12,
-            labelFontSize=10
-        )
-
-        # Display the chart
         st.altair_chart(bar_chart, use_container_width=True)
 
         # Generate word cloud
@@ -273,31 +245,29 @@ def main(smartphone_features, smartphone_keywords):
             if any(feature in text for feature in smartphone_features):
                 # Check if the comment contains keywords related to smartphones
                 if any(keyword in text for keyword in smartphone_keywords):
-                    mapped_sentiment = map_sentiment(sentiment)
-                    if mapped_sentiment == 'Positive':
+                    if sentiment == 'positive':
                         strongly_positive_comments_with_features.append(comment)
-                    elif mapped_sentiment == 'Negative':
+                    elif sentiment == 'negative':
                         strongly_negative_comments_with_features.append(comment)
 
-        # Sort comments based on the number of likes (or any other engagement metric)
-        strongly_positive_comments_with_features.sort(key=lambda x: int(x.get('likeCount', 0)), reverse=True)
-        strongly_negative_comments_with_features.sort(key=lambda x: int(x.get('likeCount', 0)), reverse=True)
+        # Sort comments based on likes in descending order
+        strongly_positive_comments_with_features.sort(key=lambda x: int(x['likeCount']), reverse=True)
+        strongly_negative_comments_with_features.sort(key=lambda x: int(x['likeCount']), reverse=True)
 
         # Display the top 5 positive comments mentioning smartphone features
         st.subheader("Top 5 Positive Comments Mentioning Smartphone Features")
         for i, comment in enumerate(strongly_positive_comments_with_features[:5]):
-            st.write(f"**Comment {i+1} (Likes: {comment.get('likeCount', 0)})**: {comment['textDisplay']}")
+            st.write(f"**Comment {i+1} (Likes: {comment['likeCount']})**: {comment['textDisplay']}")
 
         # Display the top 5 negative comments mentioning smartphone features
         st.subheader("Top 5 Negative Comments Mentioning Smartphone Features")
         for i, comment in enumerate(strongly_negative_comments_with_features[:5]):
-            st.write(f"**Comment {i+1} (Likes: {comment.get('likeCount', 0)})**: {comment['textDisplay']}")
+            st.write(f"**Comment {i+1} (Likes: {comment['likeCount']})**: {comment['textDisplay']}")
 
-
-        # Extract top 10 smartphone features and visualize them
-        st.subheader("Top 10 Smartphone Features")
+        # Extract top 20 smartphone features and visualize them
+        st.subheader("Top 20 Smartphone Features")
         features = [comment['textDisplay'] for comment in all_comments]
-        word_vectorizer = CountVectorizer(stop_words='english', max_features=10)
+        word_vectorizer = CountVectorizer(stop_words='english', max_features=20)
         word_frequencies = word_vectorizer.fit_transform(features)
         feature_names = word_vectorizer.get_feature_names_out()
         feature_counts = word_frequencies.toarray().sum(axis=0)
